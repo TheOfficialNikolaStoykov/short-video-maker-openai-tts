@@ -14,7 +14,7 @@ The server exposes an [MCP](https://github.com/modelcontextprotocol) and a REST 
 
 While the MCP server can be used with an AI Agent (like n8n) the REST endpoints provide more flexibility for video generation.
 
-You can find example n8n workflows created with the REST/MCP server [in this repository](https://github.com/gyoridavid/ai_agents_az/tree/main/episode_7).
+You can find example n8n workflows created with the REST/MCP server [in this repository](https://github.com/TheOfficialNikolaStoykov/ai_agents_az/tree/main/episode_7).
 
 # TOC
 
@@ -121,7 +121,7 @@ There are three docker images, for three different use cases. Generally speaking
 - `VIDEO_CACHE_SIZE_IN_BYTES=2097152000` (2gb) to overcome OOM errors coming from Remotion with limited resources
 
 ```jsx
-docker run -it --rm --name short-video-maker -p 3123:3123 -e LOG_LEVEL=debug -e PEXELS_API_KEY= gyoridavid/short-video-maker:latest-tiny
+docker run -it --rm --name short-video-maker -p 3123:3123 -e LOG_LEVEL=debug -e PEXELS_API_KEY= -e OPENAI_API_KEY= TheOfficialNikolaStoykov/short-video-maker-openai-tts:latest-tiny
 ```
 
 ### Normal
@@ -132,7 +132,7 @@ docker run -it --rm --name short-video-maker -p 3123:3123 -e LOG_LEVEL=debug -e 
 - `VIDEO_CACHE_SIZE_IN_BYTES=2097152000` (2gb) to overcome OOM errors coming from Remotion with limited resources
 
 ```jsx
-docker run -it --rm --name short-video-maker -p 3123:3123 -e LOG_LEVEL=debug -e PEXELS_API_KEY= gyoridavid/short-video-maker:latest
+docker run -it --rm --name short-video-maker -p 3123:3123 -e LOG_LEVEL=debug -e PEXELS_API_KEY= -e OPENAI_API_KEY= TheOfficialNikolaStoykov/short-video-maker-openai-tts:latest
 ```
 
 ### Cuda
@@ -145,7 +145,7 @@ If you own an Nvidia GPU and you want use a larger whisper model with GPU accele
 - `VIDEO_CACHE_SIZE_IN_BYTES=2097152000` (2gb) to overcome OOM errors coming from Remotion with limited resources
 
 ```jsx
-docker run -it --rm --name short-video-maker -p 3123:3123 -e LOG_LEVEL=debug -e PEXELS_API_KEY= --gpus=all gyoridavid/short-video-maker:latest-cuda
+docker run -it --rm --name short-video-maker -p 3123:3123 -e LOG_LEVEL=debug -e PEXELS_API_KEY= -e OPENAI_API_KEY= --gpus=all TheOfficialNikolaStoykov/short-video-maker-openai-tts:latest-cuda
 ```
 
 ## Docker compose
@@ -157,10 +157,11 @@ version: "3"
 
 services:
   short-video-maker:
-    image: gyoridavid/short-video-maker:latest-tiny
+    image: TheOfficialNikolaStoykov/short-video-maker-openai-tts:latest-tiny
     environment:
       - LOG_LEVEL=debug
       - PEXELS_API_KEY=
+      - OPENAI_API_KEY=
     ports:
       - "3123:3123"
     volumes:
@@ -168,7 +169,7 @@ services:
 
 ```
 
-If you are using the [Self-hosted AI starter kit](https://github.com/n8n-io/self-hosted-ai-starter-kit) you want to add `networks: ['demo']` to the\*\* `short-video-maker` service so you can reach it with http://short-video-maker:3123 in n8n.
+If you are using the [Self-hosted AI starter kit](https://github.com/n8n-io/self-hosted-ai-starter-kit) you want to add `networks: ['demo']` to the\*\* `short-video-maker` service so you can reach it with http://short-video-maker-openai-tts:3123 in n8n.
 
 # NPM
 
@@ -210,11 +211,12 @@ You can load it on http://localhost:3123
 
 # Environment variables
 
-## 🟢 Configuration
+## 🟢 Configuration
 
 | key             | description                                                     | default |
 | --------------- | --------------------------------------------------------------- | ------- |
 | PEXELS_API_KEY  | [your (free) Pexels API key](https://www.pexels.com/api/)       |         |
+| OPENAI_API_KEY  | [your OpenAI API key](https://platform.openai.com/api-keys)     |         |
 | LOG_LEVEL       | pino log level                                                  | info    |
 | WHISPER_VERBOSE | whether the output of whisper.cpp should be forwarded to stdout | false   |
 | PORT            | the port the server will listen on                              | 3123    |
@@ -433,7 +435,7 @@ Setting up the MCP (or REST) server depends on how you run n8n and the server. P
 
 |                                                   | n8n is running locally, using `n8n start`              | n8n is running locally using Docker                                                                                                                                                                                           | n8n is running in the cloud                            |
 | ------------------------------------------------- | ------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------ |
-| `short-video-maker` is running in Docker, locally | `http://localhost:3123`                                | It depends. You can technically use `http://host.docker.internal:3123` as it points to the host, but you could configure to use the same network and use the service name to communicate like `http://short-video-maker:3123` | won’t work - deploy `short-video-maker` to the cloud   |
+| `short-video-maker` is running in Docker, locally | `http://localhost:3123`                                | It depends. You can technically use `http://host.docker.internal:3123` as it points to the host, but you could configure to use the same network and use the service name to communicate like `http://short-video-maker-openai-tts:3123` | won’t work - deploy `short-video-maker` to the cloud   |
 | `short-video-maker` is running with npm/npx       | `http://localhost:3123`                                | `http://host.docker.internal:3123`                                                                                                                                                                                            | won’t work - deploy `short-video-maker` to the cloud   |
 | `short-video-maker` is running in the cloud       | You should use your IP address `http://{YOUR_IP}:3123` | You should use your IP address `http://{YOUR_IP}:3123`                                                                                                                                                                        | You should use your IP address `http://{YOUR_IP}:3123` |
 

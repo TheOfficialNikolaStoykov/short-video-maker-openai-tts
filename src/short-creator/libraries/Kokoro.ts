@@ -1,13 +1,50 @@
-import { KokoroTTS, TextSplitterStream } from "kokoro-js";
+import OpenAI from "openai";
 import {
   VoiceEnum,
   type kokoroModelPrecision,
   type Voices,
 } from "../../types/shorts";
-import { KOKORO_MODEL, logger } from "../../config";
+import { logger } from "../../config";
+
+// Map Kokoro voices to OpenAI voices
+const VOICE_MAPPING: Record<string, string> = {
+  "af_heart": "alloy",
+  "af_alloy": "alloy",
+  "af_aoede": "echo",
+  "af_bella": "fable",
+  "af_jessica": "nova",
+  "af_kore": "onyx",
+  "af_nicole": "nova",
+  "af_nova": "nova",
+  "af_river": "onyx",
+  "af_sarah": "shimmer",
+  "af_sky": "shimmer",
+  "am_adam": "alloy",
+  "am_echo": "echo",
+  "am_eric": "echo",
+  "am_fenrir": "onyx",
+  "am_liam": "onyx",
+  "am_michael": "onyx",
+  "am_onyx": "onyx",
+  "am_puck": "echo",
+  "am_santa": "onyx",
+  "bf_emma": "nova",
+  "bf_isabella": "nova",
+  "bm_george": "onyx",
+  "bm_lewis": "onyx",
+  "bf_alice": "nova",
+  "bf_lily": "nova",
+  "bm_daniel": "onyx",
+  "bm_fable": "fable",
+};
 
 export class Kokoro {
-  constructor(private tts: KokoroTTS) {}
+  private openai: OpenAI;
+
+  constructor() {
+    // OpenAI will automatically use OPENAI_API_KEY environment variable
+    this.openai = new OpenAI();
+  }
 
   async generate(
     text: string,
@@ -16,58 +53,49 @@ export class Kokoro {
     audio: ArrayBuffer;
     audioLength: number;
   }> {
-    const splitter = new TextSplitterStream();
-    const stream = this.tts.stream(splitter, {
-      voice,
-    });
-    splitter.push(text);
-    splitter.close();
+    const openaiVoice = VOICE_MAPPING[voice] || "alloy";
+    
+    try {
+      const mp3 = await this.openai.audio.speech.create({
+        model: "gpt-4o-mini-tts",
+        voice: openaiVoice as any,
+        input: text,
+        response_format: "mp3",
+      });
 
-    const output = [];
-    for await (const audio of stream) {
-      output.push(audio);
+      const arrayBuffer = await mp3.arrayBuffer();
+      
+      // For MP3, we can't easily calculate the exact duration without decoding
+      // We'll estimate based on typical MP3 bitrate (128kbps) and file size
+      const fileSize = arrayBuffer.byteLength;
+      const estimatedDuration = (fileSize * 8) / (128 * 1000); // duration in seconds
+      
+      logger.debug({ 
+        text, 
+        voice, 
+        openaiVoice,
+        estimatedDuration 
+      }, "Audio generated with OpenAI TTS");
+
+      return {
+        audio: arrayBuffer,
+        audioLength: estimatedDuration,
+      };
+    } catch (error) {
+      logger.error({ error, text, voice }, "Failed to generate audio with OpenAI TTS");
+      throw error;
     }
-
-    const audioBuffers: ArrayBuffer[] = [];
-    let audioLength = 0;
-    for (const audio of output) {
-      audioBuffers.push(audio.audio.toWav());
-      audioLength += audio.audio.audio.length / audio.audio.sampling_rate;
-    }
-
-    const mergedAudioBuffer = Kokoro.concatWavBuffers(audioBuffers);
-    logger.debug({ text, voice, audioLength }, "Audio generated with Kokoro");
-
-    return {
-      audio: mergedAudioBuffer,
-      audioLength: audioLength,
-    };
   }
 
   static concatWavBuffers(buffers: ArrayBuffer[]): ArrayBuffer {
-    const header = Buffer.from(buffers[0].slice(0, 44));
-    let totalDataLength = 0;
-
-    const dataParts = buffers.map((buf) => {
-      const b = Buffer.from(buf);
-      const data = b.slice(44);
-      totalDataLength += data.length;
-      return data;
-    });
-
-    header.writeUInt32LE(36 + totalDataLength, 4);
-    header.writeUInt32LE(totalDataLength, 40);
-
-    return Buffer.concat([header, ...dataParts]);
+    // This method is kept for compatibility but won't be used with OpenAI TTS
+    // since OpenAI returns MP3 format directly
+    return buffers[0];
   }
 
-  static async init(dtype: kokoroModelPrecision): Promise<Kokoro> {
-    const tts = await KokoroTTS.from_pretrained(KOKORO_MODEL, {
-      dtype,
-      device: "cpu", // only "cpu" is supported in node
-    });
-
-    return new Kokoro(tts);
+  static async init(_dtype: kokoroModelPrecision): Promise<Kokoro> {
+    // OpenAI initialization doesn't require model loading like Kokoro
+    return new Kokoro();
   }
 
   listAvailableVoices(): Voices[] {
